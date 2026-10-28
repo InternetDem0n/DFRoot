@@ -1,4 +1,5 @@
 name: Build
+run-name: DFRoot build - ${{ github.ref_name }}
 
 on:
   push:
@@ -7,6 +8,12 @@ on:
   pull_request:
     branches: [master, main]
   workflow_dispatch:
+    inputs:
+      build_note:
+        description: "Optional note for this manual build"
+        required: false
+        type: string
+        default: "Manual test"
 
 permissions:
   contents: write
@@ -121,13 +128,21 @@ jobs:
           fi
 
       - name: Verify APK output
+        shell: bash
         run: |
           set -euo pipefail
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            test -s app/build/outputs/apk/release/DFRoot_4.7.apk
+            apk_dir="app/build/outputs/apk/release"
           else
-            test -s app/build/outputs/apk/debug/DFRoot_4.7.apk
+            apk_dir="app/build/outputs/apk/debug"
           fi
+          apk_file="$(find "$apk_dir" -maxdepth 1 -type f -name 'DFRoot_*.apk' -print -quit)"
+          if [[ -z "$apk_file" || ! -s "$apk_file" ]]; then
+            echo "::error::No non-empty DFRoot APK found in $apk_dir"
+            find app/build/outputs/apk -maxdepth 3 -type f -print || true
+            exit 1
+          fi
+          echo "Verified APK: $apk_file"
 
       - name: Upload DFRoot APK
         uses: actions/upload-artifact@v7
